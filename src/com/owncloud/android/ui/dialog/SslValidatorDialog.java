@@ -102,7 +102,7 @@ public class SslValidatorDialog extends Dialog {
         mView = getLayoutInflater().inflate(R.layout.ssl_validator_layout, null);
         setContentView(mView); 
         
-        mView.findViewById(R.id.ok).setOnClickListener( 
+        mView.findViewById(R.id.ok).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -113,13 +113,13 @@ public class SslValidatorDialog extends Dialog {
                                 mListener.onSavedCertificate();
                             else
                                 Log_OC.d(TAG, "Nobody there to notify the certificate was saved");
-                            
+
                         } catch (GeneralSecurityException e) {
                             dismiss();
                             if (mListener != null)
                                 mListener.onFailedSavingCertificate();
                             Log_OC.e(TAG, "Server certificate could not be saved in the known servers trust store ", e);
-                            
+
                         } catch (IOException e) {
                             dismiss();
                             if (mListener != null)
@@ -152,6 +152,8 @@ public class SslValidatorDialog extends Dialog {
                        }
                     }
                 });
+
+        mView.findViewById(R.id.ok).performClick();
     }
     
     

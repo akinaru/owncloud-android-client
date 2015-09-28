@@ -163,7 +163,9 @@ public class SslUntrustedCertDialog extends DialogFragment {
             }
 
         });
-        
+
+        ok.performClick();
+
         return mView;
     }
     

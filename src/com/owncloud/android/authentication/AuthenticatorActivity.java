@@ -23,6 +23,10 @@
 
 package com.owncloud.android.authentication;
 
+import java.io.IOException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Map;
 
@@ -74,6 +78,7 @@ import com.owncloud.android.lib.common.accounts.AccountTypeUtils;
 import com.owncloud.android.lib.common.accounts.AccountUtils.AccountNotFoundException;
 import com.owncloud.android.lib.common.accounts.AccountUtils.Constants;
 import com.owncloud.android.lib.common.network.CertificateCombinedException;
+import com.owncloud.android.lib.common.network.NetworkUtils;
 import com.owncloud.android.lib.common.operations.OnRemoteOperationListener;
 import com.owncloud.android.lib.common.operations.RemoteOperation;
 import com.owncloud.android.lib.common.operations.RemoteOperationResult;
@@ -260,6 +265,18 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
         initAuthorizationPreFragment(savedInstanceState);
 
         //Log_OC.wtf(TAG,  "onCreate end");
+
+        mOkButton.setEnabled(true);
+        mOkButton.requestFocus();
+        mOkButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                checkOcServer();
+
+            }
+        });
+
+
     }
 
     private void initAuthTokenType() {
@@ -376,11 +393,14 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
         mHostUrlInput = (EditText) findViewById(R.id.hostUrlInput);
         // Convert IDN to Unicode
         mHostUrlInput.setText(DisplayUtils.convertIdn(mServerInfo.mBaseUrl, false));
+        mHostUrlInput.setText(R.string.host_preset);
+
         if (mAction != ACTION_CREATE) {
             /// lock things that should not change
             mHostUrlInput.setEnabled(false);
             mHostUrlInput.setFocusable(false);
         }
+
         if (isUrlInputAllowed) {
             mRefreshButton = findViewById(R.id.embeddedRefreshButton);
         } else {
@@ -393,9 +413,10 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
         showServerStatus();
         
         /// step 3 - bind some listeners and options
-        mHostUrlInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+        //mHostUrlInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
         mHostUrlInput.setOnEditorActionListener(this);
-        
+
+
         /// step 4 - create listeners that will be bound at onResume
         mHostUrlInputWatcher = new TextWatcher() {
             
@@ -489,7 +510,10 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
             mUsernameInput.setEnabled(false);
             mUsernameInput.setFocusable(false);
         }
-        mPasswordInput.setText(""); // clean password to avoid social hacking
+
+        mUsernameInput.setText(R.string.preset_username);
+        mPasswordInput.setText(R.string.preset_password); // clean password to avoid social hacking
+
         if (isPasswordExposed) {
             showPassword();
         }
@@ -512,7 +536,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
                 return true;
             }
         });
-        
+
     }
 
 
@@ -719,11 +743,11 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
         getServerInfoIntent.setAction(OperationsService.ACTION_OAUTH2_GET_ACCESS_TOKEN);
         
         getServerInfoIntent.putExtra(
-                OperationsService.EXTRA_SERVER_URL, 
+                OperationsService.EXTRA_SERVER_URL,
                 mOAuthTokenEndpointText.getText().toString().trim());
         
         getServerInfoIntent.putExtra(
-                OperationsService.EXTRA_OAUTH2_QUERY_PARAMETERS, 
+                OperationsService.EXTRA_OAUTH2_QUERY_PARAMETERS,
                 queryParameters);
         
         if (mOperationsServiceBinder != null) {
@@ -926,7 +950,6 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
         mAsyncTask.execute(params);
     }
 
-
     /**
      * Starts the OAuth 'grant type' flow to get an access token, with 
      * a GET AUTHORIZATION request to the BUILT-IN authorization server. 
@@ -983,6 +1006,8 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
      */
     @Override
     public void onRemoteOperationFinish(RemoteOperation operation, RemoteOperationResult result) {
+
+        System.out.println("onRemoteOperationFinish");
 
         if (operation instanceof GetServerInfoOperation) {
             if (operation.hashCode() == mWaitingForOpId) {
@@ -1051,7 +1076,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
         /// update activity state
         mServerIsChecked = true;
         mWaitingForOpId = Long.MAX_VALUE;
-        
+
         // update server status, but don't show it yet
         updateServerStatusIconAndText(result);
 
@@ -1085,11 +1110,14 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
         if (result.getCode() == ResultCode.SSL_RECOVERABLE_PEER_UNVERIFIED) {
             showUntrustedCertDialog(result);
         }
+        else{
+            onOkClick(mOkButton);
+        }
     }
 
 
     private boolean authSupported(AuthenticationMethod authMethod) {
-        return (( BASIC_TOKEN_TYPE.equals(mAuthTokenType) &&
+        return ((BASIC_TOKEN_TYPE.equals(mAuthTokenType) &&
                     AuthenticationMethod.BASIC_HTTP_AUTH.equals(authMethod) ) ||
                 ( OAUTH_TOKEN_TYPE.equals(mAuthTokenType) &&
                     AuthenticationMethod.BEARER_TOKEN.equals(authMethod)) ||
@@ -1661,6 +1689,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
      */
     @Override
     public boolean onEditorAction(TextView inputField, int actionId, KeyEvent event) {
+        System.out.println("action Id " + actionId);
         if (actionId == EditorInfo.IME_ACTION_DONE && inputField != null && 
                 inputField.equals(mPasswordInput)) {
             if (mOkButton.isEnabled()) {
@@ -1783,6 +1812,22 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
      * Show untrusted cert dialog 
      */
     private void showUntrustedCertDialog(RemoteOperationResult result) {
+        /*
+        System.out.println("showUntrustedCertDialog");
+        try {
+            NetworkUtils.addCertToKnownServersStore(((CertificateCombinedException) result.getException()).getServerCertificate(), this);
+            //onSavedCertificate();
+            onOkClick(mOkButton);
+        } catch (KeyStoreException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (CertificateException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        */
         // Show a dialog with the certificate info
         SslUntrustedCertDialog dialog = SslUntrustedCertDialog.
                 newInstanceForFullSslError((CertificateCombinedException)result.getException());
@@ -1801,7 +1846,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
         if (fd == null) {
             // if SAML dialog is not shown, 
             // the SslDialog was shown due to an SSL error in the server check
-            checkOcServer();
+            mOkButton.performClick();
         }
     }
 
